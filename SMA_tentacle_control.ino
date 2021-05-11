@@ -1,4 +1,4 @@
-const int BUFFER_SIZE_tail = 2;
+const int BUFFER_SIZE_tail = 3;
 const int n_SMAs_tail = 2;
 int pins_tail[] = {9, 11};
 
@@ -46,15 +46,15 @@ class SMA_tentacle {
       if (Serial.available()) {          
         n_bytes = Serial.readBytes(_buffer, BUFFER_SIZE);
           if (_buffer[0] < 50) { // if number sent over serial < 50 move tentacle to one side 
-            digitalWrite(_out_pins[0], HIGH);
-            digitalWrite(_out_pins[1], LOW); 
-            }
-          else{                  // otherwise move to other side 
+          //if (_buffer[0] < _buffer[1]) { // if number sent over serial < 50 move tentacle to one side 
             digitalWrite(_out_pins[0], LOW);
             digitalWrite(_out_pins[1], HIGH); 
             }
+          else{                  // otherwise move to other side 
+            digitalWrite(_out_pins[0], HIGH);
+            digitalWrite(_out_pins[1], LOW); 
+            }
         }
-    
     }
     
     void off() {
