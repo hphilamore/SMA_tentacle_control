@@ -12,6 +12,11 @@ class SMA_tentacle {
     int N_SMAs;
     int n_bytes;
     int BUFFER_SIZE;
+
+    // PID coefficients
+    int Kp = 26; 
+    int Ki;
+    int Kd; 
     
     
   public:
@@ -59,8 +64,8 @@ class SMA_tentacle {
     
       if (Serial.available()) {          
         n_bytes = Serial.readBytes(_buffer, BUFFER_SIZE);
-          if (_buffer[0] < 50) { // if number sent over serial < 50 move tentacle left 
-          //if (_buffer[0] < _buffer[1]) { // if number sent over serial < 50 move tentacle left
+          //if (_buffer[0] < 50) { // if number sent over serial < 50 move tentacle left 
+          if (_buffer[0] < _buffer[1]) { // if number sent over serial < 50 move tentacle left
             digitalWrite(_out_pins[0], LOW);
             digitalWrite(_out_pins[1], HIGH); 
             }
@@ -69,6 +74,60 @@ class SMA_tentacle {
             digitalWrite(_out_pins[1], LOW); 
             }
         }
+    }
+
+
+    void PID_serial_control_SMA(){
+    
+      if (Serial.available()) {          
+        n_bytes = Serial.readBytes(_buffer, BUFFER_SIZE);
+        static int error = _buffer[0] - _buffer[1]; // human horiz position - robot horiz position 
+        static int P = error;
+        static int PIDvalue = abs((Kp*P));// + (Ki*I) + (Kd*D);
+
+          //if (_buffer[0] < 50) { // if number sent over serial < 50 move tentacle left 
+          if (_buffer[0] < _buffer[1]) { // if number sent over serial < 50 move tentacle left
+          //if (error < 0 ){
+            analogWrite(_out_pins[0], 0);
+            analogWrite(_out_pins[1], PIDvalue); 
+            }
+          else{                  // otherwise move right 
+            analogWrite(_out_pins[0], PIDvalue);
+            analogWrite(_out_pins[1], 0); 
+            }
+        }
+    }
+
+    void PID_test_setup(){
+    
+        int A = 44;
+        int B = 84;
+
+        static int error = A - B; // human horiz position - robot horiz position 
+        Serial.print(" A = ");
+        Serial.print(A); 
+        Serial.print(" B = ");
+        Serial.print(B); 
+        Serial.print(" error = ");
+        Serial.print(error); 
+        static int P = error;
+        
+        static int PIDvalue = abs((Kp*P));// + (Ki*I) + (Kd*D);
+        Serial.print(" PID = ");
+        Serial.println(PIDvalue); 
+
+        
+          //if (_buffer[0] < 50) { // if number sent over serial < 50 move tentacle left 
+          //if (_buffer[0] < _buffer[1]) { // if number sent over serial < 50 move tentacle left
+          if (error < 0 ){
+            analogWrite(_out_pins[0], 0);
+            analogWrite(_out_pins[1], PIDvalue); 
+            }
+          else{                  // otherwise move right 
+            analogWrite(_out_pins[0], PIDvalue);
+            analogWrite(_out_pins[1], 0); 
+            }
+
     }
     
     void off() {
@@ -87,7 +146,9 @@ void setup() {
 
 void loop() {
     //sma_tentacle.button_control_SMA();
-    sma_tentacle.serial_control_SMA();
+    //sma_tentacle.serial_control_SMA();
+    sma_tentacle.PID_serial_control_SMA();
+    //sma_tentacle.PID_test_setup();
     //sma_tentacle.off();
 
 }
