@@ -12,11 +12,13 @@ class SMA_tentacle {
     int N_SMAs;
     int n_bytes;
     int BUFFER_SIZE;
+    int error;
+    int prev_error;
 
     // PID coefficients
-    int Kp = 26; 
+    int Kp = 100; // 70; // 50; //26; 
     int Ki;
-    int Kd; 
+    int Kd = 10; 
     
     
   public:
@@ -81,9 +83,12 @@ class SMA_tentacle {
     
       if (Serial.available()) {          
         n_bytes = Serial.readBytes(_buffer, BUFFER_SIZE);
-        static int error = _buffer[0] - _buffer[1]; // human horiz position - robot horiz position 
+        error = _buffer[0] - _buffer[1]; // human horiz position - robot horiz position 
         static int P = error;
-        static int PIDvalue = abs((Kp*P));// + (Ki*I) + (Kd*D);
+        static int D = error - prev_error;        
+        static int PIDvalue = abs((Kp*P + Kd*D)); // + (Kd*D);
+        
+        if(PIDvalue >= 255){ PIDvalue = 255; } // cap on voltage out to prevent overflow
 
           //if (_buffer[0] < 50) { // if number sent over serial < 50 move tentacle left 
           if (_buffer[0] < _buffer[1]) { // if number sent over serial < 50 move tentacle left
@@ -95,6 +100,7 @@ class SMA_tentacle {
             analogWrite(_out_pins[0], PIDvalue);
             analogWrite(_out_pins[1], 0); 
             }
+        prev_error = error; 
         }
     }
 
