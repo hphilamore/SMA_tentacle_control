@@ -18,7 +18,7 @@ class SMA_tentacle {
     int prev_error;
 
     // PID coefficients
-    int Kp = 10; //20; // 10;// 8; //10; // 20; //30; // 50; // 100; // 70; // 50; //26; 
+    int Kp = 8; // 10; //20; // 10;// 8; //10; // 20; //30; // 50; // 100; // 70; // 50; //26; 
     int Ki;
     int Kd = 3; //5;
     
@@ -26,11 +26,11 @@ class SMA_tentacle {
   public:
     // constructor
     SMA_tentacle(int out_pins[], const int N_SMAs, const int BUFFER_SIZE, uint8_t in_pins[]) {
-      this->N_SMAs = N_SMAs; // Use 'this->' to make attribute of the class equal to local variable 'pin' created by constructor 
+      this->N_SMAs = N_SMAs; 
       this-> BUFFER_SIZE = BUFFER_SIZE;
       
-      _out_pins = (int *)malloc(sizeof(int) * N_SMAs); // https://forum.arduino.cc/t/pass-array-size-to-class-constructor/57381
-      _buffer = (char *)malloc(sizeof(char) * BUFFER_SIZE); // buffer to store serial inputs
+      _out_pins = (int *)malloc(sizeof(int) * N_SMAs); 
+      _buffer = (char *)malloc(sizeof(char) * BUFFER_SIZE); // array to store serial inputs
       _in_pins = (uint8_t *)malloc(sizeof(uint8_t) * BUFFER_SIZE); // array to store physical inputs same length as buffer (for testing)
       
       for(int i=0; i<N_SMAs; i++){
@@ -92,15 +92,15 @@ class SMA_tentacle {
         
         if( abs(error) < 5){error = 0;} // lower cap on error  
  
-          
+        // PID variables  
         static int P = error;
         static int D = error - prev_error;    
         //static int I = I + error;    
         static int PIDvalue = abs((Kp*P + Kd*D)); // + (Kd*D);
-        //static int PIDvalue = abs((Kp*P));// + (Ki*I) + (Kd*D);
+        //static int PIDvalue = abs(Kp*P);// + (Ki*I) + (Kd*D);
 
         
-        // LED alert if voltage = max 
+        // If voltage = max --> LED alert! 
         if(PIDvalue >= 255){ 
           PIDvalue = 255; // cap on voltage out to prevent overflow
           digitalWrite(LED_pin, HIGH); 
@@ -110,16 +110,20 @@ class SMA_tentacle {
           }
 
 
+          // If in dead zone, both actuators off...
           if  (40 < _buffer[0] && _buffer[0] < 60 && 40 < _buffer[1] && _buffer[1] < 60 ) {
             digitalWrite(_out_pins[0], LOW);
             digitalWrite(_out_pins[1], LOW); 
             //digitalWrite(LED_pin, HIGH); 
           }
+          // ...otherwise move left...
           else if (_buffer[0] < _buffer[1]) { // if human position < robot position move tentacle left
             analogWrite(_out_pins[0], 0);
             analogWrite(_out_pins[1], PIDvalue); 
             //digitalWrite(LED_pin, LOW); 
             }
+          
+          // ... or right. 
           else{                  // otherwise move right 
             analogWrite(_out_pins[0], PIDvalue);
             analogWrite(_out_pins[1], 0); 
@@ -129,49 +133,12 @@ class SMA_tentacle {
         prev_error = error; 
         }
     }
-
-    void PID_test_setup(){
     
-        int A = 44;
-        int B = 84;
-
-        static int error = A - B; // human horiz position - robot horiz position 
-        Serial.print(" A = ");
-        Serial.print(A); 
-        Serial.print(" B = ");
-        Serial.print(B); 
-        Serial.print(" error = ");
-        Serial.print(error); 
-        static int P = error;
-        
-        static int PIDvalue = abs((Kp*P));// + (Ki*I) + (Kd*D);
-        Serial.print(" PID = ");
-        Serial.println(PIDvalue); 
-
-        
-          //if (_buffer[0] < 50) { // if number sent over serial < 50 move tentacle left 
-          //if (_buffer[0] < _buffer[1]) { // if number sent over serial < 50 move tentacle left
-          if (error < 0 ){
-            analogWrite(_out_pins[0], 0);
-            analogWrite(_out_pins[1], PIDvalue); 
-            }
-          else{                  // otherwise move right 
-            analogWrite(_out_pins[0], PIDvalue);
-            analogWrite(_out_pins[1], 0); 
-            }
-
-    }
-    
-    void off() {
-      for(int i=0; i<N_SMAs; i++){
-        digitalWrite(_out_pins[i], LOW);
-        delay(1000);
-      } 
-    }
-}; // semicolon at the end of the class
+}; 
 
 
 SMA_tentacle sma_tentacle(pins_tail, n_SMAs_tail, BUFFER_SIZE_tail, pins_buttons);
+
 void setup() {
   Serial.begin(57600);
 }
