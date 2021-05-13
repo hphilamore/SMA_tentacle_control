@@ -18,9 +18,13 @@ class SMA_tentacle {
     int prev_error;
 
     // PID coefficients
-    int Kp = 10; //20; // 10;// 8; //10; // 20; //30; // 50; // 100; // 70; // 50; //26; 
-    int Ki;
+    int Kp = 10; // 8; // 10; //20; // 10;// 8; //10; // 20; //30; // 50; // 100; // 70; // 50; //26; 
+    int Ki = 2;
     int Kd = 3; //5;
+    
+    int P;
+    int D;    
+    int I; 
     
     
   public:
@@ -93,11 +97,12 @@ class SMA_tentacle {
         //if( abs(error) < 5){error = 0;} // lower cap on error  
  
         // PID variables  
-        static int P = error;
-        static int D = error - prev_error;    
-        //static int I = I + error;    
-        static int PIDvalue = abs((Kp*P + Kd*D)); // + (Kd*D);
-        //static int PIDvalue = abs(Kp*P);// + (Ki*I) + (Kd*D);
+        P = error;
+        D = error - prev_error;    
+        I = I + error;  
+        static int PIDvalue = abs((Kp*P + Kd*D + Ki*I));  
+        //static int PIDvalue = abs((Kp*P + Kd*D));
+        //static int PIDvalue = abs(Kp*P);
 
         
         // If voltage = max --> LED alert! 
@@ -110,34 +115,15 @@ class SMA_tentacle {
           }
 
             // *************************************************************
-          // WITH DEAD ZONE 
-          // If in dead zone, both actuators off...
-          if  (40 < _buffer[0] && _buffer[0] < 60 && 40 < _buffer[1] && _buffer[1] < 60 ) {
-            digitalWrite(_out_pins[0], LOW);
-            digitalWrite(_out_pins[1], LOW); 
-            //digitalWrite(LED_pin, HIGH); 
-          }
-          // ...otherwise move left...
-          else if (_buffer[0] < _buffer[1]) { // if human position < robot position move tentacle left
-            analogWrite(_out_pins[0], 0);
-            analogWrite(_out_pins[1], PIDvalue); 
-            //digitalWrite(LED_pin, LOW); 
-            }
-          
-          // ... or right. 
-          else{                  // otherwise move right 
-            analogWrite(_out_pins[0], PIDvalue);
-            analogWrite(_out_pins[1], 0); 
-            //digitalWrite(LED_pin, LOW); 
-            }
-          // *************************************************************
-
-
-
-          // *************************************************************
-//          // WITHOUT DEAD ZONE
-//          // Move left...
-//          if (_buffer[0] < _buffer[1]) { // if human position < robot position move tentacle left
+//          // WITH DEAD ZONE 
+//          // If in dead zone, both actuators off...
+//          if  (40 < _buffer[0] && _buffer[0] < 60 && 40 < _buffer[1] && _buffer[1] < 60 ) {
+//            digitalWrite(_out_pins[0], LOW);
+//            digitalWrite(_out_pins[1], LOW); 
+//            //digitalWrite(LED_pin, HIGH); 
+//          }
+//          // ...otherwise move left...
+//          else if (_buffer[0] < _buffer[1]) { // if human position < robot position move tentacle left
 //            analogWrite(_out_pins[0], 0);
 //            analogWrite(_out_pins[1], PIDvalue); 
 //            //digitalWrite(LED_pin, LOW); 
@@ -153,14 +139,10 @@ class SMA_tentacle {
 
 
 
-            // If in dead zone, both actuators off...
-          if  (40 < _buffer[0] && _buffer[0] < 60 && 40 < _buffer[1] && _buffer[1] < 60 ) {
-            digitalWrite(_out_pins[0], LOW);
-            digitalWrite(_out_pins[1], LOW); 
-            //digitalWrite(LED_pin, HIGH); 
-          }
-          // ...otherwise move left...
-          else if (_buffer[0] < _buffer[1]) { // if human position < robot position move tentacle left
+          // *************************************************************
+          // WITHOUT DEAD ZONE
+          // Move left...
+          if (_buffer[0] < _buffer[1]) { // if human position < robot position move tentacle left
             analogWrite(_out_pins[0], 0);
             analogWrite(_out_pins[1], PIDvalue); 
             //digitalWrite(LED_pin, LOW); 
@@ -172,6 +154,7 @@ class SMA_tentacle {
             analogWrite(_out_pins[1], 0); 
             //digitalWrite(LED_pin, LOW); 
             }
+          // *************************************************************
             
         prev_error = error; 
         }
