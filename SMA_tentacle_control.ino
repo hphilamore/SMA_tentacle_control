@@ -18,7 +18,7 @@ class SMA_tentacle {
     int prev_error;
 
     // PID coefficients
-    int Kp = 10; // 20; //30; // 50; // 100; // 70; // 50; //26; 
+    int Kp = 10;// 8; //10; // 20; //30; // 50; // 100; // 70; // 50; //26; 
     int Ki;
     int Kd = 3; //5;
     
@@ -87,19 +87,30 @@ class SMA_tentacle {
     
       if (Serial.available()) {          
         n_bytes = Serial.readBytes(_buffer, BUFFER_SIZE);
-        error = _buffer[0] - _buffer[1]; // human horiz position - robot horiz position 
+//        _buffer[0] = floor(_buffer[0]/5)*5;
+//        _buffer[1] = floor(_buffer[1]/5)*5;
+        error = _buffer[0] - _buffer[1]; // human horiz position - robot horiz position
+        
+        if( abs(error) < 5){ 
+          error = 0;
+          //digitalWrite(LED_pin, HIGH); 
+          } 
+//         else{
+//          digitalWrite(LED_pin, LOW); 
+//          }  
+          
         static int P = error;
         static int D = error - prev_error;        
-        static int PIDvalue = abs((Kp*P + Kd*D)); // + (Kd*D);
-        //static int PIDvalue = abs((Kp*P));// + (Ki*I) + (Kd*D);
+        //static int PIDvalue = abs((Kp*P + Kd*D)); // + (Kd*D);
+        static int PIDvalue = abs((Kp*P));// + (Ki*I) + (Kd*D);
         
         if(PIDvalue >= 255){ 
           PIDvalue = 255; // cap on voltage out to prevent overflow
-          digitalWrite(LED_pin, HIGH); 
+          //digitalWrite(LED_pin, HIGH); 
           } 
-         else{
-          digitalWrite(LED_pin, LOW); 
-          }
+//         else{
+//          digitalWrite(LED_pin, LOW); 
+//          }
 
           //if (_buffer[0] < 50) { // if number sent over serial < 50 move tentacle left 
           if (_buffer[0] < _buffer[1]) { // if number sent over serial < 50 move tentacle left
