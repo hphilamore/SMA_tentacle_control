@@ -18,7 +18,7 @@ class SMA_tentacle {
     int prev_error;
 
     // PID coefficients
-    int Kp = 8; // 10; //20; // 10;// 8; //10; // 20; //30; // 50; // 100; // 70; // 50; //26; 
+    int Kp = 10; //20; // 10;// 8; //10; // 20; //30; // 50; // 100; // 70; // 50; //26; 
     int Ki;
     int Kd = 3; //5;
     
@@ -30,7 +30,7 @@ class SMA_tentacle {
       this-> BUFFER_SIZE = BUFFER_SIZE;
       
       _out_pins = (int *)malloc(sizeof(int) * N_SMAs); 
-      _buffer = (char *)malloc(sizeof(char) * BUFFER_SIZE); // array to store serial inputs
+      _buffer = (char *)malloc(sizeof(char) * BUFFER_SIZE);        // array to store serial inputs
       _in_pins = (uint8_t *)malloc(sizeof(uint8_t) * BUFFER_SIZE); // array to store physical inputs same length as buffer (for testing)
       
       for(int i=0; i<N_SMAs; i++){
@@ -70,12 +70,12 @@ class SMA_tentacle {
     
       if (Serial.available()) {          
         n_bytes = Serial.readBytes(_buffer, BUFFER_SIZE);
-          //if (_buffer[0] < 50) { // if number sent over serial < 50 move tentacle left 
-          if (_buffer[0] < _buffer[1]) { // if number sent over serial < 50 move tentacle left
+          //if (_buffer[0] < 50) {               // if number sent over serial < 50 move tentacle left 
+          if (_buffer[0] < _buffer[1]) {         // if number sent over serial < 50 move tentacle left
             digitalWrite(_out_pins[0], LOW);
             digitalWrite(_out_pins[1], HIGH); 
             }
-          else{                  // otherwise move right 
+          else{                                  // otherwise move right 
             digitalWrite(_out_pins[0], HIGH);
             digitalWrite(_out_pins[1], LOW); 
             }
@@ -90,7 +90,7 @@ class SMA_tentacle {
         error = _buffer[0] - _buffer[1]; // human horiz position - robot horiz position
 
         
-        if( abs(error) < 5){error = 0;} // lower cap on error  
+        //if( abs(error) < 5){error = 0;} // lower cap on error  
  
         // PID variables  
         static int P = error;
@@ -109,8 +109,51 @@ class SMA_tentacle {
           digitalWrite(LED_pin, LOW); 
           }
 
-
+            // *************************************************************
+          // WITH DEAD ZONE 
           // If in dead zone, both actuators off...
+          if  (40 < _buffer[0] && _buffer[0] < 60 && 40 < _buffer[1] && _buffer[1] < 60 ) {
+            digitalWrite(_out_pins[0], LOW);
+            digitalWrite(_out_pins[1], LOW); 
+            //digitalWrite(LED_pin, HIGH); 
+          }
+          // ...otherwise move left...
+          else if (_buffer[0] < _buffer[1]) { // if human position < robot position move tentacle left
+            analogWrite(_out_pins[0], 0);
+            analogWrite(_out_pins[1], PIDvalue); 
+            //digitalWrite(LED_pin, LOW); 
+            }
+          
+          // ... or right. 
+          else{                  // otherwise move right 
+            analogWrite(_out_pins[0], PIDvalue);
+            analogWrite(_out_pins[1], 0); 
+            //digitalWrite(LED_pin, LOW); 
+            }
+          // *************************************************************
+
+
+
+          // *************************************************************
+//          // WITHOUT DEAD ZONE
+//          // Move left...
+//          if (_buffer[0] < _buffer[1]) { // if human position < robot position move tentacle left
+//            analogWrite(_out_pins[0], 0);
+//            analogWrite(_out_pins[1], PIDvalue); 
+//            //digitalWrite(LED_pin, LOW); 
+//            }
+//          
+//          // ... or right. 
+//          else{                  // otherwise move right 
+//            analogWrite(_out_pins[0], PIDvalue);
+//            analogWrite(_out_pins[1], 0); 
+//            //digitalWrite(LED_pin, LOW); 
+//            }
+          // *************************************************************
+
+
+
+            // If in dead zone, both actuators off...
           if  (40 < _buffer[0] && _buffer[0] < 60 && 40 < _buffer[1] && _buffer[1] < 60 ) {
             digitalWrite(_out_pins[0], LOW);
             digitalWrite(_out_pins[1], LOW); 
