@@ -1,11 +1,13 @@
 const int BUFFER_SIZE_tail = 3;
 const int n_SMAs_tail = 2;
 const int pins_tail[] = {9, 11};
+
 const uint8_t pins_buttons[] = {A1,A2,A3};
 
 class SMA_tentacle {
   
   private:
+    const int LED_pin = 2;
     uint8_t *_in_pins;
     int *_out_pins;
     char *_buffer;
@@ -16,9 +18,9 @@ class SMA_tentacle {
     int prev_error;
 
     // PID coefficients
-    int Kp = 100; // 70; // 50; //26; 
+    int Kp = 10; // 20; //30; // 50; // 100; // 70; // 50; //26; 
     int Ki;
-    int Kd = 10; 
+    int Kd = 3; //5;
     
     
   public:
@@ -43,7 +45,9 @@ class SMA_tentacle {
       for(int i=0; i<N_SMAs; i++){
         pinMode(_out_pins[i], OUTPUT);
         digitalWrite(_out_pins[i], LOW);
-        //pinMode(_in_pins[i], INPUT);
+        pinMode(_in_pins[i], INPUT);
+        pinMode(LED_pin, OUTPUT);
+        digitalWrite(LED_pin, LOW);
       }      
     }
     
@@ -87,8 +91,15 @@ class SMA_tentacle {
         static int P = error;
         static int D = error - prev_error;        
         static int PIDvalue = abs((Kp*P + Kd*D)); // + (Kd*D);
+        //static int PIDvalue = abs((Kp*P));// + (Ki*I) + (Kd*D);
         
-        if(PIDvalue >= 255){ PIDvalue = 255; } // cap on voltage out to prevent overflow
+        if(PIDvalue >= 255){ 
+          PIDvalue = 255; // cap on voltage out to prevent overflow
+          digitalWrite(LED_pin, HIGH); 
+          } 
+         else{
+          digitalWrite(LED_pin, LOW); 
+          }
 
           //if (_buffer[0] < 50) { // if number sent over serial < 50 move tentacle left 
           if (_buffer[0] < _buffer[1]) { // if number sent over serial < 50 move tentacle left
