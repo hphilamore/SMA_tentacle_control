@@ -71,7 +71,7 @@ class SMA_tentacle {
     }
 
     void serial_control_SMA(){
-    
+      // control tentacle over serial by simply choosing to move left or right based on value received 
       if (Serial.available()) {          
         n_bytes = Serial.readBytes(_buffer, BUFFER_SIZE);
           //if (_buffer[0] < 50) {               // if number sent over serial < 50 move tentacle left 
@@ -88,7 +88,7 @@ class SMA_tentacle {
 
 
     void PID_serial_control_SMA(){
-    
+      // control tentacle over serial P / PD / PID controller
       if (Serial.available()) {          
         n_bytes = Serial.readBytes(_buffer, BUFFER_SIZE);
         error = _buffer[0] - _buffer[1]; // human horiz position - robot horiz position
@@ -115,7 +115,7 @@ class SMA_tentacle {
           }
 
             // *************************************************************
-//          // WITH DEAD ZONE 
+//          // P or PD CONTROLLER WITH DEAD ZONE TO PREVENT WOBBLE
 //          // If in dead zone, both actuators off...
 //          if  (40 < _buffer[0] && _buffer[0] < 60 && 40 < _buffer[1] && _buffer[1] < 60 ) {
 //            digitalWrite(_out_pins[0], LOW);
@@ -140,7 +140,7 @@ class SMA_tentacle {
 
 
           // *************************************************************
-          // WITHOUT DEAD ZONE
+          // P / PD / PID CONTROLLER WITHOUT DEAD ZONE
           // Move left...
           if (_buffer[0] < _buffer[1]) { // if human position < robot position move tentacle left
             analogWrite(_out_pins[0], 0);
@@ -173,7 +173,4 @@ void loop() {
     //sma_tentacle.button_control_SMA();
     //sma_tentacle.serial_control_SMA();
     sma_tentacle.PID_serial_control_SMA();
-    //sma_tentacle.PID_test_setup();
-    //sma_tentacle.off();
-
 }
