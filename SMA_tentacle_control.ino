@@ -1,18 +1,67 @@
  /* 
  
- Hardware setup:
+ Hardware setup: Push button inputs (repeat for pins A1 / A2 / A3 / A4)
  
- MPU9250 Breakout --------- Arduino
- VCC ---------------------- 3.3V
- INT ---------------------- D12
- SDA ----------------------- A4
- SCL ----------------------- A5
- GND ---------------------- GND
+ |---- Vcc
+ |
+ // Push button switch (normally open) 
+ |
+ |---- A1 / A2 / A3 / A4 
+ |
+ |---- 10kohm 
+ |
+ |---- GND
 
- [SDA and SCL should have external pull-up resistors (to 3.3V)]
+
+
+ Hardware setup: Transistors controlling output to SMAs (repeat for pins D3/ D5/ D9/ D11  and SMAs a / b / c / d)
+ 
+ |---- D3 / D5 / D9 / D11 
+ |
+ |---- Gate BC547C (NPN General Purpose Transistor) 
+ |
+ |---- GND
+
+
+
+ |---- Vcc
+ |
+ |---- Collector BC547C (NPN General Purpose Transistor)
+
+
+ |---- Emitter BC547C (NPN General Purpose Transistor)
+ |
+ |---- SMA a / b / c / d positive terminal 
+
+
+ |---- SMA a & b & c & d negative terminal (terminals for all SMAs connected together) 
+ |
+ |---- GND 
+ 
+
+
+ Hardware setup: Other 
+
+ |---- Pin D2  
+ |
+ |---- LED
+ |
+ |---- GND
+
+
+ 
+ |---- GND (arduino)  
+ |
+ |---- GND (supply) 
+
+
+
+ |---- 5V (supply) or Arduino 5V 
+ |
+ |---- Vcc 
  */
  
- //const int BUFFER_SIZE_tail = 3;
+//const int BUFFER_SIZE_tail = 3;
 //const uint8_t pins_buttons[] = {A1,A2,A3};
 
 //const int n_SMAs_tail = 2;
@@ -23,7 +72,6 @@
 
 const int BUFFER_SIZE_tail = 4;
 const uint8_t pins_buttons[] = {A1,A2,A3,A4};
-
 const int n_SMAs_tail = 4;
 const int pins_tail[] = {3, 5, 9, 11};
 
