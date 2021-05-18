@@ -1,8 +1,31 @@
-const int BUFFER_SIZE_tail = 3;
-const int n_SMAs_tail = 2;
-const int pins_tail[] = {9, 11};
+ /* 
+ 
+ Hardware setup:
+ 
+ MPU9250 Breakout --------- Arduino
+ VCC ---------------------- 3.3V
+ INT ---------------------- D12
+ SDA ----------------------- A4
+ SCL ----------------------- A5
+ GND ---------------------- GND
 
-const uint8_t pins_buttons[] = {A1,A2,A3};
+ [SDA and SCL should have external pull-up resistors (to 3.3V)]
+ */
+ 
+ //const int BUFFER_SIZE_tail = 3;
+//const uint8_t pins_buttons[] = {A1,A2,A3};
+
+//const int n_SMAs_tail = 2;
+//const int pins_tail[] = {9, 11};
+
+//const int n_SMAs_tail = 3;
+//const int pins_tail[] = {5, 9, 11};
+
+const int BUFFER_SIZE_tail = 4;
+const uint8_t pins_buttons[] = {A1,A2,A3,A4};
+
+const int n_SMAs_tail = 4;
+const int pins_tail[] = {3, 5, 9, 11};
 
 class SMA_tentacle {
   
@@ -170,7 +193,7 @@ void setup() {
 }
 
 void loop() {
-    //sma_tentacle.button_control_SMA();
+    sma_tentacle.button_control_SMA();
     //sma_tentacle.serial_control_SMA();
-    sma_tentacle.PID_serial_control_SMA();
+    //sma_tentacle.PID_serial_control_SMA();
 }
