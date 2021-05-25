@@ -61,6 +61,13 @@
  |---- Vcc 
  */
  
+#include <Wire.h>
+#include <LiquidCrystal_I2C.h>
+
+LiquidCrystal_I2C lcd(0x27,20,4);  // set the LCD address to 0x27 for a 16 chars and 2 line display
+
+int T = 1;
+ 
 const int BUFFER_SIZE_tail = 3;
 //const uint8_t pins_buttons[] = {A1,A2,A3};
 
@@ -72,7 +79,7 @@ const int BUFFER_SIZE_tail = 3;
 
 //const int BUFFER_SIZE_tail = 4;
 const int n_buttons = 4;
-const uint8_t pins_buttons[] = {A1,A2,A3,A4};
+const uint8_t pins_buttons[] = {A0,A1,A2,A3};
 
 
 // const int pins_tail[] = {3, 5, 9, 11};
@@ -333,9 +340,24 @@ SMA_tentacle sma_tentacle(pins_tail, n_SMAs_tail, BUFFER_SIZE_tail, pins_buttons
 
 void setup() {
   Serial.begin(57600);
+
+//  lcd.init();                      // initialize the lcd 
+  lcd.init();
+  // Print a message to the LCD.
+  lcd.backlight();
+  lcd.setCursor(1,0);
+  lcd.print("hello everyone");
+//  lcd.setCursor(1,1);
+//  lcd.print("konichiwaa");
 }
 
 void loop() {
+  T = T + 1;
+  lcd.setCursor(1,1);
+  lcd.print(T);
+  //delay(1000);
+  
+  
 //  if(n_SMAs_tail == 4){
 //    sma_tentacle.button4_control_SMA4();
 //  }
