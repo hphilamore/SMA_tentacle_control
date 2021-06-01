@@ -40,7 +40,28 @@
  |---- SMA a & b & c & d // e & f negative terminal (terminals for all SMAs connected together) 
  |
  |---- GND 
+
+
+ Hardware setup: Breathing sensor waistband (FSR) connected to A0
+
+ |---- 3v3
+ |
+ // FSR (waistband)
+ |
+ |---- A6
+ |
+ |---- 10kohm 
+ |
+ |---- GND
+
+
+ Hardware setup: LCD (optional)
  
+ Arduino  ---- LCD 
+ 5V       ---- Vcc
+ GND      ---- GDN
+ SCL (A5) ---- SCL
+ SDA (A4) ---- SDA 
 
 
  Hardware setup: Other 
@@ -73,6 +94,8 @@ LiquidCrystal_I2C lcd(0x27,20,4);              // set the LCD address to 0x27 fo
 const int BUFFER_SIZE = 3;                     // number of inputs to recive over serial (x pos human, y pos human, x pos robot)
 const int n_buttons = 4;                       // number of push buttons 
 const uint8_t pins_buttons[] = {A0,A1,A2,A3};  // button pins 
+const uint8_t pin_breathing = A6;              // pin for breathing sensor
+const int pin_LED = 2;                         // pin for LED
 
 // 4 SMA actuator 
 const int n_SMAs = 4;
@@ -85,16 +108,26 @@ const int pins_SMAs[] = {3, 5, 9, 11};
 class SMA_tentacle {
   
   private:
-    const int LED_pin = 2;
-    uint8_t *_in_pins;
-    int *_out_pins;
-    char *_buffer;
-    int N_SMAs;
-    int N_buttons;
-    int n_bytes;
-    int BUFFER_SIZE;
-    int error;
-    int prev_error;
+    
+    uint8_t *_in_pins;    // push buttons
+    int *_out_pins;       // SMAs
+    char *_buffer;        // info received over serial
+    int N_SMAs;           // number of SMAs
+    int BUFFER_SIZE;      // size of buffer received over serial
+    int N_buttons;        // number of push buttons 
+    int pin_LED;          // LED
+    int n_bytes;          // bytes received over serial
+    
+
+    // Breathing sensor
+    uint8_t pin_breathing;         // pin for breathing sensor 
+    
+    int _breathing_max;            // Max and min readings when doing a large inhale/exhale
+    int _breathing_min;
+    float _breathing_midpoint;
+    
+    int _previous_breathing_value; // For control of SMAs based on inhale/exhale direction
+    int _current_breathing_value;
 
 
     // PID coefficients and variables 
@@ -105,14 +138,18 @@ class SMA_tentacle {
     int P;
     int D;    
     int I; 
+    int error;
+    int prev_error;
     
     
   public:
     // constructor
-    SMA_tentacle(int out_pins[], const int N_SMAs, const int BUFFER_SIZE, uint8_t in_pins[], const int N_buttons) {
-      this->N_SMAs = N_SMAs; 
+    SMA_tentacle(uint8_t in_pins[], int out_pins[], const int N_SMAs, const int BUFFER_SIZE, const int N_buttons, uint8_t pin_breathing, int pin_LED) {
+      this-> N_SMAs = N_SMAs; 
       this-> BUFFER_SIZE = BUFFER_SIZE;  
       this-> N_buttons = N_buttons;
+      this-> pin_breathing = pin_breathing;
+      this-> pin_LED = pin_LED; 
       
       _out_pins = (int *)malloc(sizeof(int) * N_SMAs);           // array to store SMA outputs       
       _buffer = (char *)malloc(sizeof(char) * BUFFER_SIZE);      // array to store serial inputs
@@ -139,13 +176,17 @@ class SMA_tentacle {
       } 
 
       // LED off
-      pinMode(LED_pin, OUTPUT);      
-      digitalWrite(LED_pin, LOW);
+      pinMode(pin_LED, OUTPUT);      
+      digitalWrite(pin_LED, LOW);
 
       for(int i=0; i<N_buttons; i++){
         pinMode(_in_pins[i], INPUT);
       }     
     }
+
+
+    
+    
 
     void button4_control_SMA(){
        /* use 4 push buttons to control tentacle */
@@ -394,16 +435,111 @@ class SMA_tentacle {
       } 
     }
 
+
+    void breathing_init(){
+      /* 
+       *  Initialising breathing sensor to get min and max 
+       *  Run this function in main program setup() function ONLY if using function breathing_control_min_max_SMA2()
+      */
+      // Find min and max of breathing while LED is on
+      digitalWrite(pin_LED, HIGH);
+      
+      int test_breathing_min = analogRead(pin_breathing);
+      int test_breathing_max = analogRead(pin_breathing);
+      int test_breathing_value = analogRead(pin_breathing);
+      
+      // Take min and max readings in 5*i ms window
+      for (int i = 0; i <= 2000; i++) {
+        test_breathing_value = analogRead(pin_breathing);
+        test_breathing_min = min(test_breathing_value, test_breathing_min);
+        test_breathing_max = max(test_breathing_value, test_breathing_max);
+        delay(5);
+      }
+
+      digitalWrite(pin_LED, LOW);
+      // Set min and max 
+      _breathing_min = test_breathing_min;
+      _breathing_max = test_breathing_max;
+      _breathing_midpoint = test_breathing_min + (test_breathing_max - test_breathing_min)/2;
+
+//      Serial.print("Breathing minimum reading: "); 
+//      Serial.println(_breathing_min); 
+//      Serial.print("Breathing maximum reading: "); 
+//      Serial.println(_breathing_max); 
+//      Serial.print("Breathing midpoint reading: "); 
+//      Serial.println(_breathing_midpoint); 
+    }
+
+
+    
+    void breathing_control_min_max_SMA2(){
+      /* 
+       *  Simple breathing control: Get midpoint of inhale + exhale and turn SMA1 on if less than that, SMA2 on if more      
+       *  LED will come on for 5 seconds at the beginning: inhale and exhale deeply in this time!
+      */ 
+      
+       // use breathing sensor waistband to control tentacle
+       int breathing_value = analogRead(pin_breathing);
+       Serial.println(breathing_value);
+       if(breathing_value > _breathing_midpoint){
+          digitalWrite(_out_pins[0], LOW);
+          digitalWrite(_out_pins[1], HIGH);
+          Serial.println("Inhale");
+       } else {
+          digitalWrite(_out_pins[1], LOW);
+          digitalWrite(_out_pins[0], HIGH);
+          Serial.println("Exhale");
+       } 
+    }
+
+    
+    void breathing_control_SMA2(){
+      /*
+       * Breathing control by whether FSR reading is increasing (SMA1 on) or decreasing (SMA2 on)     
+       * Does not need breathing initialisation
+       */
+
+      // This value defines the response: too small and it is noisy, too large and slow response
+      int response_resolution = 40;
+      
+      int _current_breathing_value = analogRead(pin_breathing);
+      Serial.print("Previous: ");
+      Serial.println(_previous_breathing_value);
+      Serial.print("Current: ");
+      Serial.println(_current_breathing_value);
+
+      // If the FSR reading has noticably changed since previous readings 
+      // then update SMAs accordingly and reset previous_breathing_value
+       if(_current_breathing_value - _previous_breathing_value > response_resolution){
+          digitalWrite(_out_pins[0], LOW);
+          digitalWrite(_out_pins[1], HIGH);
+          Serial.println("Inhale");
+          _previous_breathing_value = _current_breathing_value;
+       } 
+       else if(_current_breathing_value - _previous_breathing_value < -response_resolution) {
+          digitalWrite(_out_pins[1], LOW);
+          digitalWrite(_out_pins[0], HIGH);
+          Serial.println("Exhale");
+          _previous_breathing_value = _current_breathing_value;
+       } 
+       else {
+       }
+    }
+
     
 }; 
 
 
-SMA_tentacle sma_tentacle(pins_SMAs, n_SMAs, BUFFER_SIZE, pins_buttons, n_buttons);
+SMA_tentacle sma_tentacle(pins_buttons, pins_SMAs, n_SMAs, BUFFER_SIZE, n_buttons, pin_breathing, pin_LED);
 
 void setup() {
   Serial.begin(57600);
-  lcd.init();                      // initialize the lcd 
+  delay(1000);              // pause while setting up 
+  lcd.init();               // initialize the lcd 
   lcd.backlight();
+  
+  //sma_tentacle.breathing_init(); // Initialise the breathing sensor - record min and max values
+                                   // Only needed if using function breathing_control_min_max_SMA2()
 }
 
 void loop() {
@@ -411,4 +547,10 @@ void loop() {
     //sma_tentacle.serial_control_SMA();
     //sma_tentacle.PID_serial_control_SMA();
     sma_tentacle.open_loop_bang_bang_2D(8);
+
+    // Run the basic breathing sensor control of SMAs (needs initialisation to get min and max)
+    //sma_tentacle.breathing_control_min_max_SMA2();
+  
+    // Run the breathing sensor control of SMAs (does not need initialisation)
+    //sma_tentacle.breathing_control_SMA2();
 }
