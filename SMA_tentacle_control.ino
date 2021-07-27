@@ -89,7 +89,7 @@
 
 LiquidCrystal_I2C lcd(0x27,20,4);              // set the LCD address to 0x27 for a 16 chars and 2 line display
  
-const int BUFFER_SIZE = 3;                     // number of inputs to recive over serial (x pos human, y pos human, x pos robot)
+const int BUFFER_SIZE = 4;                     // number of inputs to recive over serial (x pos human, y pos human, x pos robot)
 const int n_buttons = 4;                       // number of push buttons 
 const uint8_t pins_buttons[] = {A0,A1,A2,A3};  // button pins 
 const uint8_t pin_breathing = A6;              // pin for breathing sensor
@@ -339,15 +339,15 @@ class SMA_tentacle {
        * scale amlpitude of vibration motor to amplitude of horizontal position. 
        */
 
-       lcd.setCursor(1,0);
-       lcd.print("robot ");
-       lcd.setCursor(6,0);
-       lcd.print(int(_buffer[2]));
-
-       lcd.setCursor(1,1);
-       lcd.print("val ");
-       lcd.setCursor(6,1);
-       lcd.print(abs(int(_buffer[2])));
+//       lcd.setCursor(1,0);
+//       lcd.print("robot ");
+//       lcd.setCursor(6,0);
+//       lcd.print(int(_buffer[2]));
+//
+//       lcd.setCursor(1,1);
+//       lcd.print("val ");
+//       lcd.setCursor(6,1);
+//       lcd.print(abs(int(_buffer[2])));
 
       
        float vib = map(abs(int(_buffer[2])), 0, 50, 0, 255);
@@ -360,10 +360,10 @@ class SMA_tentacle {
         digitalWrite(pin_vib_motor, LOW);
         }
 
-       lcd.setCursor(1,2);
-       lcd.print("vib ");
-       lcd.setCursor(6,2);
-       lcd.print(vib);
+//       lcd.setCursor(1,2);
+//       lcd.print("vib ");
+//       lcd.setCursor(6,2);
+//       lcd.print(vib);
       
 
     }
@@ -425,23 +425,33 @@ class SMA_tentacle {
        *  Move tentacle in 2D plane based on x-y coordinates of human 
        *  Open loop controller that moves tentacle towards 1 of 4 / 8 positions (value given in function call) 
       */
-      if (Serial.available()) {          
+      if (Serial.available()) {    
+        
         n_bytes = Serial.readBytes(_buffer, BUFFER_SIZE);
         
-        int x = _buffer[0];                     // horizontal position human 
-        int y = _buffer[1];                     // vertical position human
-        //int C = _buffer[2];                   // (horizontal position of robot [unused])
+        int y = _buffer[0];                     // horizontal position human 
+        int C = _buffer[1];                     // vertical position human
+        int D = _buffer[2];                   // (horizontal position of robot [unused])
+        int x = _buffer[3];
 
         float A = atan2(double(y), double(x));  // angle between x-y posotion of human and orthogonal axes with origin at centre of field of view 
 
         // Display information 
+        lcd.clear();
         lcd.setCursor(0,0);
         lcd.print(x);
         lcd.setCursor(6,0);
         lcd.print(y);
         lcd.setCursor(0,1);
-        lcd.print(A);
+        lcd.print(C);
         lcd.setCursor(6,1);
+        lcd.print(D);
+//
+//        lcd.setCursor(0,2);
+//        lcd.print(A);
+//        
+        lcd.setCursor(6,2);
+        
 
 
         // Move tentacle to 1 of 4 positions by actuating 1 SMA at a time 
@@ -478,6 +488,7 @@ class SMA_tentacle {
               analogWrite(_out_pins[i], 0);
             }
           }
+          delay(50);
         }
 
         // Move tentacle to 1 of 8 positions by actuating 1/2 SMAs at a time 
@@ -671,12 +682,12 @@ void loop() {
     // sma_tentacle.breathing_control_SMA2(); // Run the breathing sensor control of SMAs (does not need initialisation)
 
     // *** 2D tentacle motion **
-    //sma_tentacle.open_loop_bang_bang_2D(8);
+    sma_tentacle.open_loop_bang_bang_2D(8);
 
     // *** 1D side to side motion
-    sma_tentacle.PID_serial_control_SMA();
-    sma_tentacle.timeout();
-    sma_tentacle.vibrate();
+    //sma_tentacle.PID_serial_control_SMA();
+    //sma_tentacle.timeout();
+    //sma_tentacle.vibrate();
     
 
     
