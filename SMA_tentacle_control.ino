@@ -93,6 +93,7 @@ const int BUFFER_SIZE = 3;                     // number of inputs to recive ove
 const int n_buttons = 4;                       // number of push buttons 
 const uint8_t pins_buttons[] = {A0,A1,A2,A3};  // button pins 
 const uint8_t pin_breathing = A6;              // pin for breathing sensor
+const uint8_t pin_vib_motor = 10;              // pin for vibrating motor
 const int pin_LED = 2;                         // pin for LED
 
 // 4 SMA actuator 
@@ -115,8 +116,13 @@ class SMA_tentacle {
     int N_buttons;        // number of push buttons 
     int pin_LED;          // LED
     int n_bytes;          // bytes received over serial
-    
 
+    // used for timeout
+    unsigned long time_now;
+    unsigned long time_then;
+    float x_now;
+    float x_then;
+    
     // Breathing sensor
     uint8_t pin_breathing;         // pin for breathing sensor 
     
@@ -176,6 +182,10 @@ class SMA_tentacle {
       // LED off
       pinMode(pin_LED, OUTPUT);      
       digitalWrite(pin_LED, LOW);
+
+      // vib_motor off
+      pinMode(pin_vib_motor, OUTPUT);      
+      digitalWrite(pin_vib_motor, LOW);
 
       for(int i=0; i<N_buttons; i++){
         pinMode(_in_pins[i], INPUT);
@@ -323,7 +333,91 @@ class SMA_tentacle {
         }
     }
 
+    void vibrate(){
+      /*
+       * Assuming that the horizontal values sent over serial are [-50, 50]
+       * scale amlpitude of vibration motor to amplitude of horizontal position. 
+       */
 
+       lcd.setCursor(1,0);
+       lcd.print("robot ");
+       lcd.setCursor(6,0);
+       lcd.print(int(_buffer[2]));
+
+       lcd.setCursor(1,1);
+       lcd.print("val ");
+       lcd.setCursor(6,1);
+       lcd.print(abs(int(_buffer[2])));
+
+      
+       float vib = map(abs(int(_buffer[2])), 0, 50, 0, 255);
+       //analogWrite(pin_vib_motor, vib);
+       if(vib>60){
+        //digitalWrite(pin_vib_motor, HIGH);
+        analogWrite(pin_vib_motor, vib);
+       }
+       else{
+        digitalWrite(pin_vib_motor, LOW);
+        }
+
+       lcd.setCursor(1,2);
+       lcd.print("vib ");
+       lcd.setCursor(6,2);
+       lcd.print(vib);
+      
+
+    }
+
+    void timeout(){
+      /*
+       * Return actuator to centre if position has been the same for too long
+       * TODO : don't just turn off SMAs, make robot return to centre if inactive for too long
+       */
+      
+      unsigned long time_out = 10000;
+      int delta_x = 3;
+
+      // if first run, set prev. x pos to current x pos
+      if(time_then == time_now){                           
+        x_then = _buffer[0];
+       }
+
+
+       time_now = millis();                           // time now
+       x_now = _buffer[0];                            // marker position now
+
+       
+       if (abs(x_now - x_then) < delta_x){            // check if marker position has changed... 
+        
+            if ((time_now - time_then) > time_out){   // marker position not changed for > timeout --> turn off all SMAs, reset timer
+              for(int i=0; i<(N_SMAs/2); i++){analogWrite(_out_pins[i], 0);}
+            }
+       }
+       
+       else{                                          // update timer if marker position changed
+        time_then = time_now;                   
+        x_then = x_now;                     
+       }
+
+       
+      // Display info
+//      lcd.setCursor(1,0);
+//      lcd.print("now  ");
+//      lcd.print(time_now);
+//
+//      lcd.setCursor(1,2);
+//      lcd.print("x_now  ");
+//      lcd.print(x_now);
+//
+//      lcd.setCursor(1,1);
+//      lcd.print("then ");
+//      lcd.print(time_then);
+//
+//      lcd.setCursor(1,3);
+//      lcd.print("x_then ");
+//      lcd.print(x_then);
+       
+    }
 
 
     void open_loop_bang_bang_2D(int positions){
@@ -566,6 +660,8 @@ void setup() {
                                    // Only needed if using function breathing_control_min_max_SMA2()
 }
 
+
+
 void loop() {
     //sma_tentacle.button_control_SMA();
     //sma_tentacle.serial_control_SMA();
@@ -579,6 +675,8 @@ void loop() {
 
     // *** 1D side to side motion
     sma_tentacle.PID_serial_control_SMA();
+    sma_tentacle.timeout();
+    sma_tentacle.vibrate();
     
 
     
