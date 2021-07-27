@@ -2,6 +2,7 @@
   *  
   *  Control of a SMA-driven tentacle using command inputs over serial / using push buttons / using breathing sensor (variable resistor)
   *  To set up the code, select whether a 4 or 6 SMA tentacle will be used by setting variables n_SMAs and pins_SMAs
+  *  Serial input expected: horizontal and vertical coordinates in orthogonal axes with centre at (0,0) 
  
  Hardware setup: Push button inputs (repeat for pins A0 / A1 / A2 / A3)
  
@@ -22,12 +23,9 @@
  |---- D3 / D5 / D9 / D11 // D6 / D10
  |
  |---- Gate BC547C (NPN General Purpose Transistor) 
- |
- |---- GND
 
-            
 
- |---- Vcc
+ |---- Vcc (5V on arduino or external 5V power supply) 
  |
  |---- Collector BC547C (NPN General Purpose Transistor)
 
@@ -287,18 +285,27 @@ class SMA_tentacle {
         //static int PIDvalue = abs((Kp*P + Kd*D + Ki*I));   // PID
         
         // Display info
+//        lcd.setCursor(1,0);
+//        lcd.print("error");
+//        lcd.print(error);
+//        lcd.setCursor(1,1);
+//        lcd.print("PIDvalue");
+//        lcd.print(PIDvalue);
+
         lcd.setCursor(1,0);
-        lcd.print("error");
-        lcd.print(error);lcd.setCursor(1,1);
-        lcd.print("PIDvalue");
-        lcd.print(PIDvalue);
+        lcd.print(_buffer[0]);
+        lcd.setCursor(6,0);
+        lcd.print(_buffer[1]);
+        lcd.setCursor(1,1);
+        lcd.print(_buffer[2]);
+ 
 
         
         if(PIDvalue >= 255){PIDvalue = 255;}                 // upper cap on voltage out to prevent overflow 
 
-        lcd.setCursor(1,2);
-        lcd.print("PIDvalue");
-        lcd.print(PIDvalue);
+//        lcd.setCursor(1,2);
+//        lcd.print("PIDvalue");
+//        lcd.print(PIDvalue);
 
         // if human position < robot position move tentacle left
         if (_buffer[0] < _buffer[2]) {                     
@@ -315,6 +322,7 @@ class SMA_tentacle {
         prev_error = error; 
         }
     }
+
 
 
 
@@ -388,44 +396,48 @@ class SMA_tentacle {
           else if((-PI/4 <= A) and (A < PI/8)){
               lcd.print("A");
               SMA_on[0]=1; 
-              SMA_on[3]=1; 
+              //SMA_on[3]=1; 
           }
           else if((PI/8 <= A) and (A < 3*PI/8)){
               lcd.print("B"); 
-              SMA_on[0]=1; 
+              SMA_on[0]=1;
+              SMA_on[1]=1;  
               
           }
           else if((3*PI/8 <= A) and (A < 5*PI/8)){
               lcd.print("C");
-              SMA_on[0]=1; 
+              //SMA_on[0]=1; 
               SMA_on[1]=1; 
           }
           else if((5*PI/8 <= A) and (A < 7*PI/8)){
               lcd.print("D");
               SMA_on[1]=1;
+              SMA_on[2]=1;
           }
           else if(((7*PI/8 <= A) and (A <= PI)) or (-PI <= A) and (A < -7*PI/8)){
               lcd.print("E"); 
-              SMA_on[1]=1; 
+              //SMA_on[1]=1; 
               SMA_on[2]=1;
           }
           else if((-7*PI/8 <= A) and (A < -5*PI/8)){
               lcd.print("F");
               SMA_on[2]=1;
+              SMA_on[3]=1;
           }
           else if((-5*PI/8 <= A) and (A < -3*PI/8)){
               lcd.print("G"); 
-              SMA_on[2]=1; 
+              //SMA_on[2]=1; 
               SMA_on[3]=1;
           }
           else if((-3*PI/8 <= A) and (A < -PI/8)){
               lcd.print("H"); 
               SMA_on[3]=1;
+              SMA_on[0]=1;
           }  
           
           for(int i=0; i<N_SMAs; i++){
             if(SMA_on[i]== 1){
-              analogWrite(_out_pins[i], 100);
+              analogWrite(_out_pins[i], 240);
             }
             else{
               analogWrite(_out_pins[i], 0);
@@ -503,22 +515,34 @@ class SMA_tentacle {
       int response_resolution = 40;
       
       int _current_breathing_value = analogRead(pin_breathing);
-      Serial.print("Previous: ");
-      Serial.println(_previous_breathing_value);
-      Serial.print("Current: ");
-      Serial.println(_current_breathing_value);
+      // Display information 
+      lcd.setCursor(0,0);
+      lcd.print("Previous: ");
+      lcd.print(_previous_breathing_value);
+      lcd.setCursor(0,1);
+      lcd.print("Current: ");
+      lcd.print(_current_breathing_value);
+
+//      Serial.print("Previous: ");
+//      Serial.println(_previous_breathing_value);
+//      Serial.print("Current: ");
+//      Serial.println(_current_breathing_value);
 
       // If the FSR reading has noticably changed since previous readings 
       // then update SMAs accordingly and reset previous_breathing_value
        if(_current_breathing_value - _previous_breathing_value > response_resolution){
-          digitalWrite(_out_pins[0], LOW);
-          digitalWrite(_out_pins[1], HIGH);
+        for(int i=0; i<(N_SMAs/2); i++){digitalWrite(_out_pins[i], LOW);}      // left SMAs on 
+        for(int i=(N_SMAs/2); i<N_SMAs; i++){digitalWrite(_out_pins[i], HIGH);}  // right SMAs off 
+//          digitalWrite(_out_pins[0], LOW);
+//          digitalWrite(_out_pins[1], HIGH);
           Serial.println("Inhale");
           _previous_breathing_value = _current_breathing_value;
        } 
        else if(_current_breathing_value - _previous_breathing_value < -response_resolution) {
-          digitalWrite(_out_pins[1], LOW);
-          digitalWrite(_out_pins[0], HIGH);
+//          digitalWrite(_out_pins[1], LOW);
+//          digitalWrite(_out_pins[0], HIGH);
+          for(int i=0; i<(N_SMAs/2); i++){digitalWrite(_out_pins[i], HIGH);}      // left SMAs on 
+          for(int i=(N_SMAs/2); i<N_SMAs; i++){digitalWrite(_out_pins[i], LOW);}  // right SMAs off 
           Serial.println("Exhale");
           _previous_breathing_value = _current_breathing_value;
        } 
@@ -545,12 +569,17 @@ void setup() {
 void loop() {
     //sma_tentacle.button_control_SMA();
     //sma_tentacle.serial_control_SMA();
-    //sma_tentacle.PID_serial_control_SMA();
-    sma_tentacle.open_loop_bang_bang_2D(8);
+    //sma_tentacle.breathing_control_min_max_SMA2(); // Run the basic breathing sensor control of SMAs (needs initialisation to get min and max)
 
-    // Run the basic breathing sensor control of SMAs (needs initialisation to get min and max)
-    //sma_tentacle.breathing_control_min_max_SMA2();
-  
-    // Run the breathing sensor control of SMAs (does not need initialisation)
-    //sma_tentacle.breathing_control_SMA2();
+    // *** BREATHING SENSORS ***
+    // sma_tentacle.breathing_control_SMA2(); // Run the breathing sensor control of SMAs (does not need initialisation)
+
+    // *** 2D tentacle motion **
+    //sma_tentacle.open_loop_bang_bang_2D(8);
+
+    // *** 1D side to side motion
+    sma_tentacle.PID_serial_control_SMA();
+    
+
+    
 }
