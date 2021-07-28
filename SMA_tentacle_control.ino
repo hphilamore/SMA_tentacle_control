@@ -85,12 +85,7 @@
  
 #include <Wire.h>
 #include <LiquidCrystal_I2C.h>
-#include <Adafruit_NeoPixel.h>
 #include <math.h>
-
-#define NUM_LEDS 18 
-#define PINa 4
-Adafruit_NeoPixel stripA = Adafruit_NeoPixel(NUM_LEDS, PINa, NEO_GRB + NEO_KHZ800);
 
 LiquidCrystal_I2C lcd(0x27,20,4);              // set the LCD address to 0x27 for a 16 chars and 2 line display
  
@@ -357,8 +352,8 @@ class SMA_tentacle {
       
        float vib = map(abs(int(_buffer[2])), 0, 50, 0, 255);
        //analogWrite(pin_vib_motor, vib);
-       if(vib>60){
-        //digitalWrite(pin_vib_motor, HIGH);
+       if(vib>20){
+        digitalWrite(pin_vib_motor, HIGH);
         analogWrite(pin_vib_motor, vib);
        }
        else{
@@ -434,10 +429,10 @@ class SMA_tentacle {
         
         n_bytes = Serial.readBytes(_buffer, BUFFER_SIZE);
         
-        int y = _buffer[0];                     // horizontal position human 
-        int C = _buffer[1];                     // vertical position human
-        int D = _buffer[2];                   // (horizontal position of robot [unused])
-        int x = _buffer[3];
+        int x = _buffer[0];                     // horizontal position human 
+        int y = _buffer[1];                     // vertical position human
+        int C = _buffer[2];                   // (horizontal position of robot [unused])
+        // int  = _buffer[3];
 
         float A = atan2(double(y), double(x));  // angle between x-y posotion of human and orthogonal axes with origin at centre of field of view 
 
@@ -664,24 +659,7 @@ class SMA_tentacle {
    
 }; 
 
-    // Set all LEDs to a given color and apply it (visible)
-    void setAll(byte red, byte green, byte blue) {
-      for(int i = 0; i < NUM_LEDS; i++ ) {
-        stripA.setPixelColor(i, stripA.Color(red, green, blue));
-      }
-      showStrip();
-    }
-    
-    void showStrip() {
-     #ifdef ADAFRUIT_NEOPIXEL_H 
-       // NeoPixel
-       stripA.show();
-     #endif
-     #ifndef ADAFRUIT_NEOPIXEL_H
-       // FastLED
-       FastLED.show();
-     #endif
-    }
+
 
 
 SMA_tentacle sma_tentacle(pins_buttons, pins_SMAs, n_SMAs, BUFFER_SIZE, n_buttons, pin_breathing, pin_LED);
@@ -691,8 +669,6 @@ void setup() {
   delay(1000);              // pause while setting up 
   lcd.init();               // initialize the lcd 
   lcd.backlight();
-  stripA.begin();
-  stripA.show(); // Initialize all pixels to 'off'
   
   //sma_tentacle.breathing_init(); // Initialise the breathing sensor - record min and max values
                                    // Only needed if using function breathing_control_min_max_SMA2()
@@ -708,19 +684,16 @@ void loop() {
     //sma_tentacle.breathing_control_min_max_SMA2(); // Run the basic breathing sensor control of SMAs (needs initialisation to get min and max)
 
     // *** BREATHING SENSORS ***
-    // sma_tentacle.breathing_control_SMA2(); // Run the breathing sensor control of SMAs (does not need initialisation)
+    //sma_tentacle.breathing_control_SMA2(); // Run the breathing sensor control of SMAs (does not need initialisation)
 
     // *** 2D tentacle motion **
     sma_tentacle.open_loop_bang_bang_2D(8);
-    for(int i = 0; i < NUM_LEDS; i++ ) {
-        stripA.setPixelColor(i, stripA.Color(100, 100, 2));
-      }
-    stripA.show();
+
 
     // *** 1D side to side motion
-    //sma_tentacle.PID_serial_control_SMA();
-    //sma_tentacle.timeout();
-    //sma_tentacle.vibrate();
+//    sma_tentacle.PID_serial_control_SMA();
+//    sma_tentacle.timeout();
+//    sma_tentacle.vibrate();
     
 
     
