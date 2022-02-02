@@ -87,23 +87,40 @@
 #include <LiquidCrystal_I2C.h>
 #include <math.h>
 
+
+
+//****************************************************************************************************************************************
+/*
+ *   Variables to set
+ */
+const int operating_mode = 0;                   // Choice of : 0 = push button, 1 = breathing sensor with init, 2 = breathing sensor, 3 = serial communication
+const int n_DOF = 1;                            // degrees of freedom of tentacle motion i.e. number of antagonist SMA pairs (choice of  1 or 2 )
+const int n_SMAs = 4;                           // number of SMA actuators in tentacle (choice of 4 or 6)
+
+//****************************************************************************************************************************************
+
+
+
+
 LiquidCrystal_I2C lcd(0x27,20,4);              // set the LCD address to 0x27 for a 16 chars and 2 line display
 
-// NB buffer size 4 chnages order of items in buffer 
 const int BUFFER_SIZE = 3;                     // number of inputs to recive over serial (x pos human, y pos human, x pos robot)
 const int n_buttons = 4;                       // number of push buttons 
 const uint8_t pins_buttons[] = {A0,A1,A2,A3};  // button pins 
 const uint8_t pin_breathing = A6;              // pin for breathing sensor
 const uint8_t pin_vib_motor = 10;              // pin for vibrating motor
 const int pin_LED = 2;                         // pin for LED
+const int pins_4SMAs[] = {3, 5, 9, 11};                   // 4 SMAs
+const int pins_6SMAs[] = {3, 5, 6, 9, 10, 11};                   // 6 SMAs
 
-// 4 SMA actuator 
-//const int n_SMAs = 4;
-//const int pins_SMAs[] = {3, 5, 9, 11}; 
 
-// 6 SMA actuator 
-const int n_SMAs = 6;
-const int pins_SMAs[] = {3, 5, 6, 9, 10, 11};
+
+////const int n_SMAs = 4;
+////const int pins_SMAs[] = {3, 5, 9, 11}; 
+//
+//// 6 SMA actuator 
+//const int n_SMAs = 6;
+//const int pins_SMAs[] = {3, 5, 6, 9, 10, 11};
 
 
 
@@ -113,9 +130,14 @@ class SMA_tentacle {
   private:
     
     uint8_t *_in_pins;    // push buttons
-    int *_out_pins;       // SMAs
-    char *_buffer;        // info received over serial
+
     int _N_SMAs;           // number of SMAs
+    int _N_DOF;           // number of degrees of freedom
+    int *_out_pins;       // SMAs
+    //int *_out_pins=0;       // SMAs
+    //int _out_pins = (int *)malloc(sizeof(int) * _N_SMAs);           // array to store SMA outputs
+    char *_buffer;        // info received over serial
+    
     int _BUFFER_SIZE;      // size of buffer received over serial
     int _N_buttons;        // number of push buttons 
     int _pin_LED;          // LED
@@ -140,8 +162,7 @@ class SMA_tentacle {
 
 
     // PID coefficients and variables 
-    int _Kp = 5;    // 4 SMAs            10; // 8; // 10; //20; // 10;// 8; //10; // 20; //30; // 50; // 100; // 70; // 50; //26; 
-    //int Kp = 10; // 6 SMAs
+    int _Kp;
     int _Ki = 2;
     int _Kd = 3; //5;
     int _P;
@@ -153,22 +174,40 @@ class SMA_tentacle {
     
   public:
     // constructor
-    SMA_tentacle(uint8_t in_pins[], int out_pins[], const int N_SMAs, const int BUFFER_SIZE, const int N_buttons, uint8_t pin_breathing, int pin_LED, int pin_vib_motor) {
-      this-> _N_SMAs = N_SMAs; 
+    SMA_tentacle(uint8_t in_pins[], const int N_SMAs, const int N_DOF, const int BUFFER_SIZE, const int N_buttons, uint8_t pin_breathing, int pin_LED, int pin_vib_motor) {
+      this-> _N_SMAs = N_SMAs;
+      this-> _N_DOF = N_DOF; 
       this-> _BUFFER_SIZE = BUFFER_SIZE;  
       this-> _N_buttons = N_buttons;
       this-> _pin_breathing = pin_breathing;
-      this-> _pin_LED = pin_LED; 
+      this-> _pin_LED = pin_LED;
+       
+
+      if(_N_SMAs == 4){
+        this-> _Kp = 5;    // 4 SMAs
+        }
+      else{
+        this-> _Kp = 10;  // 6 SMAs
+        } 
       
-      _out_pins = (int *)malloc(sizeof(int) * N_SMAs);           // array to store SMA outputs       
+             
       _buffer = (char *)malloc(sizeof(char) * BUFFER_SIZE);      // array to store serial inputs
-      _in_pins = (uint8_t *)malloc(sizeof(uint8_t) * N_buttons); // array to store physical inputs same length as buffer (for testing)
+     
       
-      for(int i=0; i<N_SMAs; i++){
-        _out_pins[i] = out_pins[i];
+      
+      _out_pins = (int *)malloc(sizeof(int) * _N_SMAs);           // array to store SMA outputs
+
+      for(int i=0; i<_N_SMAs; i++){                               // populate with SMA pins
+        if(_N_SMAs == 4){                     // 4 SMAs
+          _out_pins[i] = pins_4SMAs[i];
+        }
+        else{                                 // 6 SMAs
+          _out_pins[i] = pins_6SMAs[i];
+        }
       }
 
-      for(int i=0; i<N_buttons; i++){
+      _in_pins = (uint8_t *)malloc(sizeof(uint8_t) * _N_buttons); // array to store physical inputs from buttons
+      for(int i=0; i<_N_buttons; i++){                            // populate with button pins
         _in_pins[i] = in_pins[i];
       }
       
@@ -201,22 +240,44 @@ class SMA_tentacle {
     
     
 
-    void button4_control_SMA(){
-       /* use 4 push buttons to control tentacle */
-       if (_N_SMAs == 4){
-         Serial.println("4 SMAs");
-         this-> button4_control_SMA4();
+    void button_control(){
+       /* use 2 or 4 push buttons to control tentacle */
+       if (_N_DOF == 1){
+         Serial.println("side to side");
+         this-> button_control_1DOF();
         }
           
-       else if (_N_SMAs == 6){
-         Serial.println("6 SMAs");
-         this-> button4_control_SMA6();
+       else if (_N_DOF ==2 ){
+         Serial.println("joystick");
+         this-> button_control_2DOF();
+         } 
+       
+    }
+
+
+    void serial_control(){
+       /* use serial communication to control tentacle */
+       if (_N_DOF == 1){
+         Serial.println("side to side");
+         this-> PID_serial_control_1DOF();
+         //this->timeout();                // return to centre if inactive
+         //this->vibrate();                // with vibrating motor 
+        }
+          
+       else if (_N_DOF ==2 ){
+         Serial.println("joystick");
+         this-> open_loop_serial_control_2DOF(8);
          } 
        
     }
     
-    void button4_control_SMA4(){
-       /* use 4 push buttons to control tentacle with 4 SMAs at 90 degree spacing */
+    void button_control_2DOF(){
+       /* 
+       Use 4 push buttons to control motion of 2DOF (2 antagonist SMA pair) tentacle.
+       Each button corresponds to an SMA actuator.
+       When the button is pushed, the corresponding SMA actuates. 
+       */
+       
        for(int i=0; i<_N_buttons; i++){
         if(digitalRead(_in_pins[i]) == HIGH){ 
           digitalWrite(_out_pins[i], HIGH); 
@@ -232,63 +293,68 @@ class SMA_tentacle {
     }
 
 
-  void button4_control_SMA6(){
-        /* use 4 push buttons to control tentacle with 6 SMAs, 3 on each side (left and right) */
+  void button_control_1DOF(){
+        /* 
+       Use 2 push buttons to control side to side motion of 1DOF (1 antagonist SMA pair) tentacle.
+       Pushing one button actuaets SMAs on left side, pushing the other actuates the right 
+       */
         // LEFT
         if(digitalRead(_in_pins[0]) == HIGH){ 
-            for(int i=0; i<3; i++){
-              digitalWrite(_out_pins[i], HIGH);
-              Serial.println("LEFT");
-            }
-          }
+            for(int i=0; i<(_N_SMAs/2); i++){digitalWrite(_out_pins[i], HIGH);}    // left SMAs on 
+            Serial.println("LEFT");
+        }
         else{
-          for(int i=0; i<3; i++){
-            digitalWrite(_out_pins[i], LOW);
-          }
+          for(int i=0; i<(_N_SMAs/2); i++){digitalWrite(_out_pins[i], LOW);}       // left SMAs off 
         }
 
         // RIGHT
         if(digitalRead(_in_pins[1]) == HIGH){ 
-          for(int i=3; i<6; i++){
-            digitalWrite(_out_pins[i], HIGH);
-            Serial.println("RIGHT");
-          }
+          for(int i=(_N_SMAs/2); i<_N_SMAs; i++){digitalWrite(_out_pins[i], HIGH);} // right SMAs on
+          Serial.println("RIGHT");
         }
         else{
-          for(int i=3; i<6; i++){
-            digitalWrite(_out_pins[i], LOW);
-          }
+          for(int i=(_N_SMAs/2); i<_N_SMAs; i++){digitalWrite(_out_pins[i], LOW);}  // right SMAs off 
         }
     }
 
 
-    void serial_control_SMA(){
-      /* 
-       *  Move tentacle left or right based on the horizontal position of the human (sent over serial) relative to:
-       * A) the centre of the field of view 
-       * B) the horizontal position of the robot
-      */
+    void serial_control_1DOF(){
+       /* 
+       Control side to side motion of 1DOF (1 antagonist SMA pair) tentacle using difference between horizontal position 
+       of robot and horizontal position to track (e.g. position of human), sent over serial.
+       
+       Serial data expected: 
+       serial buffer 0 = horizontal position to track (e.g. horizontal position of human) 
+       serial buffer 1 = vertical position to track (e.g. vertical position of human) 
+       serial buffer 2 = horizontal position of robot
+       */
 
       if (Serial.available()) {          
         _n_bytes = Serial.readBytes(_buffer, _BUFFER_SIZE);
-          //if (_buffer[0] < 50) {                                                  // if horizontal position of human < centre of field of view, move tentacle left 
-          if (_buffer[0] < _buffer[2]) {                                            // if horizontal position of human < horizontal position of robot, move tentacle left 
-            for(int i=0; i<(_N_SMAs/2); i++){digitalWrite(_out_pins[i], HIGH);}      // left SMAs on 
+          if (_buffer[0] < _buffer[2]) {                                              // if horizontal position to track < horizontal position of robot, move tentacle left 
+            for(int i=0; i<(_N_SMAs/2); i++){digitalWrite(_out_pins[i], HIGH);}       // left SMAs on 
             for(int i=(_N_SMAs/2); i<_N_SMAs; i++){digitalWrite(_out_pins[i], LOW);}  // right SMAs off 
             }
-          else{                                  // otherwise move right 
-            for(int i=0; i<(_N_SMAs/2); i++){digitalWrite(_out_pins[i], LOW);}
-            for(int i=(_N_SMAs/2); i<_N_SMAs; i++){digitalWrite(_out_pins[i], HIGH);} 
+          else{                                                                       // otherwise move right 
+            for(int i=0; i<(_N_SMAs/2); i++){digitalWrite(_out_pins[i], LOW);}        // left SMAs off
+            for(int i=(_N_SMAs/2); i<_N_SMAs; i++){digitalWrite(_out_pins[i], HIGH);} // right SMAs on
             }
         }
     }
 
 
-    void PID_serial_control_SMA(){
-      /*       
-       * Move tentacle left or right based on error between horizontal position of human and horizontal position of robot using P / PD / PID controller 
-      */
-      // control tentacle over serial P / PD / PID controller
+    void PID_serial_control_1DOF(){
+       /* 
+       Control side to side motion of 1DOF (1 antagonist SMA pair) tentacle using PID controller. 
+       Error for P / PD / PID control equal to difference between horizontal position of robot and horizontal 
+       position to track (e.g. position of human), sent over serial. 
+        
+       Serial data expected: 
+       serial buffer 0 = horizontal position to track (e.g. horizontal position of human) 
+       serial buffer 1 = vertical position to track (e.g. vertical position of human) 
+       serial buffer 2 = horizontal position of robot
+       */
+
       if (Serial.available()) {          
         _n_bytes = Serial.readBytes(_buffer, _BUFFER_SIZE);
         _error = _buffer[0] - _buffer[2];                     // human horiz position - robot horiz position
@@ -299,17 +365,9 @@ class SMA_tentacle {
         _P = _error;
         _D = _error - _prev_error;    
         _I = _I + _error;  
-        int PIDvalue = abs(_Kp*_P);                            // P
+        int PIDvalue = abs(_Kp*_P);                          // P
         //static int PIDvalue = abs((Kp*P + Kd*D));          // PD
         //static int PIDvalue = abs((Kp*P + Kd*D + Ki*I));   // PID
-        
-        // Display info
-//        lcd.setCursor(1,0);
-//        lcd.print("error");
-//        lcd.print(error);
-//        lcd.setCursor(1,1);
-//        lcd.print("PIDvalue");
-//        lcd.print(PIDvalue);
 
         lcd.setCursor(1,0);
         lcd.print(_buffer[0]);
@@ -317,14 +375,8 @@ class SMA_tentacle {
         lcd.print(_buffer[1]);
         lcd.setCursor(1,1);
         lcd.print(_buffer[2]);
- 
 
-        
         if(PIDvalue >= 255){PIDvalue = 255;}                 // upper cap on voltage out to prevent overflow 
-
-//        lcd.setCursor(1,2);
-//        lcd.print("PIDvalue");
-//        lcd.print(PIDvalue);
 
         // if human position < robot position move tentacle left
         if (_buffer[0] < _buffer[2]) {                     
@@ -344,43 +396,37 @@ class SMA_tentacle {
 
     void vibrate(){
       /*
-       * Assuming that the horizontal values sent over serial are [-50, 50]
-       * scale amlpitude of vibration motor to amplitude of horizontal position. 
-       */
-
-//       lcd.setCursor(1,0);
-//       lcd.print("robot ");
-//       lcd.setCursor(6,0);
-//       lcd.print(int(_buffer[2]));
-//
-//       lcd.setCursor(1,1);
-//       lcd.print("val ");
-//       lcd.setCursor(6,1);
-//       lcd.print(abs(int(_buffer[2])));
-
-      
+       Scales amplitude of vibration motor voltage to amplitude of horizontal position of robot, sent over serial.
+       
+       Serial data expected: 
+       serial buffer 0 = horizontal position to track (e.g. horizontal position of human) 
+       serial buffer 1 = vertical position to track (e.g. vertical position of human) 
+       serial buffer 2 = horizontal position of robot
+       
+       Assumes that horizontal position values sent over serial are in range (-50, 50)  
+      */
+     
        float vib = map(abs(int(_buffer[2])), 0, 50, 0, 255);
-       //analogWrite(pin_vib_motor, vib);
+       
        if(vib>20){
-        digitalWrite(_pin_vib_motor, HIGH);
         analogWrite(_pin_vib_motor, vib);
        }
+       
        else{
         digitalWrite(_pin_vib_motor, LOW);
-        }
-
-//       lcd.setCursor(1,2);
-//       lcd.print("vib ");
-//       lcd.setCursor(6,2);
-//       lcd.print(vib);
-      
-
+        } 
     }
 
     void timeout( unsigned long time_out){
       /*
-       * Return actuator to centre if position has been the same for too long
-       * TODO : don't just turn off SMAs, make robot return to centre if inactive for too long
+       Turns off SMAs to try and return actuator to centre if position to track (sent over serial)
+       hasn't changed within a threshold time period. 
+       TODO : don't just turn off SMAs, make robot return to centre if inactive for too long
+       
+       Serial data expected: 
+       serial buffer 0 = horizontal position to track (e.g. horizontal position of human) 
+       serial buffer 1 = vertical position to track (e.g. vertical position of human) 
+       serial buffer 2 = horizontal position of robot
        */
       
       time_out = 10000;
@@ -391,48 +437,31 @@ class SMA_tentacle {
         _x_then = _buffer[0];
        }
 
-
        _time_now = millis();                           // time now
-       _x_now = _buffer[0];                            // marker position now
+       _x_now = _buffer[0];                            // position to track now
 
-       
-       if (abs(_x_now - _x_then) < delta_x){            // check if marker position has changed... 
+       if (abs(_x_now - _x_then) < delta_x){            // check if position to track has changed... 
         
-            if ((_time_now - _time_then) > time_out){   // marker position not changed for > timeout --> turn off all SMAs, reset timer
-              for(int i=0; i<(_N_SMAs/2); i++){analogWrite(_out_pins[i], 0);}
+            if ((_time_now - _time_then) > time_out){   // position to track not changed for > timeout --> turn off all SMAs, reset timer
+              for(int i=0; i<(_N_SMAs); i++){digitalWrite(_out_pins[i], LOW);}
             }
        }
        
-       else{                                          // update timer if marker position changed
+       else{                                          // update timer if position to track changed
         _time_then = _time_now;                   
         _x_then = _x_now;                     
        }
-
-       
-      // Display info
-//      lcd.setCursor(1,0);
-//      lcd.print("now  ");
-//      lcd.print(time_now);
-//
-//      lcd.setCursor(1,2);
-//      lcd.print("x_now  ");
-//      lcd.print(x_now);
-//
-//      lcd.setCursor(1,1);
-//      lcd.print("then ");
-//      lcd.print(time_then);
-//
-//      lcd.setCursor(1,3);
-//      lcd.print("x_then ");
-//      lcd.print(x_then);
        
     }
 
 
-    void open_loop_bang_bang_2D(int positions){
+    void open_loop_serial_control_2DOF(int positions){
       /* 
-       *  Move tentacle in 2D plane based on x-y coordinates of human 
-       *  Open loop controller that moves tentacle towards 1 of 4 / 8 positions (value given in function call) 
+       Control motion of 2DOF (2 antagonist SMA pair) tentacle using open loop control. 
+       x-y coordinates of position to track, sent over serial, are discretised into 
+       4 / 8 positions (value given in function call).
+       Open loop controller actuates 1 or 2 SMAs based on the discrete position. All 
+      other SMAs are relaxed.  
       */
       if (Serial.available()) {    
         
@@ -440,10 +469,9 @@ class SMA_tentacle {
         
         int x = _buffer[0];                     // horizontal position human 
         int y = _buffer[1];                     // vertical position human
-        int C = _buffer[2];                   // (horizontal position of robot [unused])
-        // int  = _buffer[3];
+        int C = _buffer[2];                     // (horizontal position of robot [unused])
 
-        float A = atan2(double(y), double(x));  // angle between x-y posotion of human and orthogonal axes with origin at centre of field of view 
+        float A = atan2(double(y), double(x));  // angle between x-y position to track and orthogonal axes, with origin at centre of field of view 
 
         // Display information 
         lcd.clear();
@@ -453,19 +481,9 @@ class SMA_tentacle {
         lcd.print(y);
         lcd.setCursor(0,1);
         lcd.print(C);
-//        lcd.setCursor(6,1);
-//        lcd.print(D);
-//
-//        lcd.setCursor(0,2);
-//        lcd.print(A);
-//        
-        lcd.setCursor(6,2);
 
         
-        
-
-
-        // Move tentacle to 1 of 4 positions by actuating 1 SMA at a time 
+        // Move tentacle to 1 of 4/8 discrete positions by actuating 1/2 SMA at a time 
         if (positions==4){
           
           int SMA_on;                                  // initialise variable 
@@ -600,7 +618,7 @@ class SMA_tentacle {
 
 
     
-    void breathing_control_min_max_SMA2(){
+    void breathing_control_min_max(){
       /* 
        *  Simple breathing control: Get midpoint of inhale + exhale and turn SMA1 on if less than that, SMA2 on if more      
        *  LED will come on for 5 seconds at the beginning: inhale and exhale deeply in this time!
@@ -621,7 +639,7 @@ class SMA_tentacle {
     }
 
     
-    void breathing_control_SMA2(){
+    void breathing_control(){
       /*
        * Breathing control by whether FSR reading is increasing (SMA1 on) or decreasing (SMA2 on)     
        * Does not need breathing initialisation
@@ -639,26 +657,17 @@ class SMA_tentacle {
       lcd.print("Current: ");
       lcd.print(_current_breathing_value);
 
-//      Serial.print("Previous: ");
-//      Serial.println(_previous_breathing_value);
-//      Serial.print("Current: ");
-//      Serial.println(_current_breathing_value);
-
       // If the FSR reading has noticably changed since previous readings 
       // then update SMAs accordingly and reset previous_breathing_value
        if(_current_breathing_value - _previous_breathing_value > response_resolution){
-        for(int i=0; i<(_N_SMAs/2); i++){digitalWrite(_out_pins[i], LOW);}      // left SMAs on 
+        for(int i=0; i<(_N_SMAs/2); i++){digitalWrite(_out_pins[i], LOW);}         // left SMAs on 
         for(int i=(_N_SMAs/2); i<_N_SMAs; i++){digitalWrite(_out_pins[i], HIGH);}  // right SMAs off 
-//          digitalWrite(_out_pins[0], LOW);
-//          digitalWrite(_out_pins[1], HIGH);
           Serial.println("Inhale");
           _previous_breathing_value = _current_breathing_value;
        } 
        else if(_current_breathing_value - _previous_breathing_value < -response_resolution) {
-//          digitalWrite(_out_pins[1], LOW);
-//          digitalWrite(_out_pins[0], HIGH);
           for(int i=0; i<(_N_SMAs/2); i++){digitalWrite(_out_pins[i], HIGH);}      // left SMAs on 
-          for(int i=(_N_SMAs/2); i<_N_SMAs; i++){digitalWrite(_out_pins[i], LOW);}  // right SMAs off 
+          for(int i=(_N_SMAs/2); i<_N_SMAs; i++){digitalWrite(_out_pins[i], LOW);} // right SMAs off 
           Serial.println("Exhale");
           _previous_breathing_value = _current_breathing_value;
        } 
@@ -671,7 +680,7 @@ class SMA_tentacle {
 
 
 
-SMA_tentacle sma_tentacle(pins_buttons, pins_SMAs, n_SMAs, BUFFER_SIZE, n_buttons, pin_breathing, pin_LED, pin_vib_motor);
+SMA_tentacle sma_tentacle(pins_buttons, n_SMAs, n_DOF, BUFFER_SIZE, n_buttons, pin_breathing, pin_LED, pin_vib_motor);
 
 void setup() {
   Serial.begin(57600);
@@ -684,28 +693,28 @@ void setup() {
 }
 
 
-
-
-
 void loop() {
-    sma_tentacle.button4_control_SMA();
-    //sma_tentacle.serial_control_SMA();
-    //sma_tentacle.breathing_control_min_max_SMA2(); // Run the basic breathing sensor control of SMAs (needs initialisation to get min and max)
-
-    // *** BREATHING SENSORS ***
-    //sma_tentacle.breathing_control_SMA2(); // Run the breathing sensor control of SMAs (does not need initialisation)
-
-    // *** 2D tentacle motion **
-    //sma_tentacle.open_loop_bang_bang_2D(8);
-
-
-    // *** 1D side to side motion
-    /*
-    sma_tentacle.PID_serial_control_SMA();
-    sma_tentacle.timeout();   // return to centre if inactive
-    sma_tentacle.vibrate();   // with vibrating motor 
-    */
     
+    
+    if(operating_mode == 0){
+      sma_tentacle.button_control();
+    }
+
+    else if(operating_mode == 1){
+      sma_tentacle.breathing_control_min_max();
+    }
+
+    else if(operating_mode == 2){
+      sma_tentacle.breathing_control();
+    }
+
+    else if(operating_mode == 3){
+      sma_tentacle.serial_control();
+    }
+
+    else{
+      Serial.println("No operating mode set");
+    }
 
     
 }
